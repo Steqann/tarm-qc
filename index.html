@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Tarm QC</title>
+<style>
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface2: #f0eeea;
+    --border: #e0ddd8;
+    --border2: #ccc9c2;
+    --text: #1a1916;
+    --muted: #7a7870;
+    --hint: #aaa89f;
+    --radius: 12px;
+    --radius-sm: 9px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { background: var(--bg); font-family: -apple-system, 'Helvetica Neue', sans-serif; font-size: 16px; color: var(--text); }
+
+  .shell { max-width: 640px; margin: 0 auto; }
+
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 20px 14px; position: sticky; top: 0; z-index: 10; }
+  .topbar-row { display: flex; align-items: center; justify-content: space-between; }
+  .topbar h1 { font-size: 16px; font-weight: 600; }
+  .stepind { font-size: 14px; color: var(--muted); }
+  .prog { display: flex; gap: 5px; margin-top: 12px; }
+  .prog-seg { flex: 1; height: 4px; background: var(--border); border-radius: 2px; transition: background 0.25s; }
+  .prog-seg.done { background: var(--hint); }
+  .prog-seg.active { background: var(--text); }
+
+  .content { padding: 24px 20px 48px; }
+  .step { display: none; }
+  .step.on { display: block; }
+
+  .sec { font-size: 12px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--hint); margin: 28px 0 14px; }
+  .sec:first-child { margin-top: 0; }
+
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 7px; }
+  input[type=text], input[type=email], select, textarea {
+    width: 100%; padding: 15px 16px; font-size: 17px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text);
+    font-family: inherit; appearance: none; -webkit-appearance: none;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--border2); }
+  select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 16px center; padding-right: 44px; }
+  textarea { resize: none; line-height: 1.5; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* Large toggle buttons — main interaction pattern */
+  .toggle-group { display: flex; gap: 10px; }
+  .tog {
+    flex: 1; padding: 20px 12px; font-size: 18px; font-weight: 600; text-align: center;
+    background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius);
+    cursor: pointer; transition: all 0.12s; user-select: none; color: var(--muted);
+    line-height: 1.3; min-height: 64px; display: flex; align-items: center; justify-content: center;
+  }
+  .tog.on { background: var(--text); color: var(--surface); border-color: var(--text); }
+  .tog:active { opacity: 0.75; transform: scale(0.98); }
+
+  /* Pill checkboxes */
+  .pill-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill {
+    display: inline-flex; align-items: center; padding: 13px 20px;
+    border: 2px solid var(--border); border-radius: 30px; font-size: 16px; font-weight: 500;
+    cursor: pointer; background: var(--surface); transition: all 0.12s;
+    user-select: none; color: var(--muted);
+  }
+  .pill.on { background: var(--text); color: var(--surface); border-color: var(--text); }
+  .pill input { display: none; }
+
+  /* Big number inputs for caliber/meter */
+  .bignum input[type=number] { font-size: 30px; font-weight: 700; text-align: center; padding: 18px 8px; letter-spacing: -0.5px; }
+  .bignum label { text-align: center; font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--hint); }
+
+  /* Piece navigation */
+  .piece-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 16px; margin-bottom: 22px;
+  }
+  .piece-center { text-align: center; }
+  .piece-title { font-size: 22px; font-weight: 700; }
+  .piece-sub { font-size: 13px; color: var(--muted); margin-top: 3px; }
+  .nav-btn {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+    width: 56px; height: 56px; font-size: 26px; display: flex; align-items: center;
+    justify-content: center; cursor: pointer; color: var(--text);
+  }
+  .nav-btn:active { background: var(--border); }
+  .nav-btn:disabled { opacity: 0.2; cursor: default; }
+
+  /* Stats */
+  .stat-bar {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 0; display: flex; margin: 20px 0;
+  }
+  .stat-item { text-align: center; flex: 1; border-right: 1px solid var(--border); }
+  .stat-item:last-child { border-right: none; }
+  .stat-val { font-size: 24px; font-weight: 700; }
+  .stat-lbl { font-size: 11px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .dot-strip { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--border); }
+  .dot.filled { background: var(--text); }
+
+  /* Under/over */
+  .uo-input { display: none; margin-top: 10px; }
+  .uo-input.show { display: block; }
+
+  /* Buttons */
+  .btn {
+    display: block; width: 100%; padding: 20px; font-size: 18px; font-weight: 700;
+    border-radius: var(--radius); cursor: pointer; text-align: center;
+    transition: all 0.12s; font-family: inherit; border: none; margin-top: 12px;
+  }
+  .btn-primary { background: var(--text); color: #fff; }
+  .btn-primary:active { opacity: 0.8; }
+  .btn-outline { background: var(--surface); color: var(--text); border: 2px solid var(--border); font-weight: 600; }
+  .btn-outline:active { background: var(--surface2); }
+  .btn-ghost { background: none; color: var(--muted); border: none; font-size: 15px; padding: 14px; font-weight: 500; }
+
+  /* Review */
+  .rv-row { display: flex; justify-content: space-between; align-items: baseline; padding: 11px 0; border-bottom: 1px solid var(--border); font-size: 15px; gap: 12px; }
+  .rv-key { color: var(--muted); flex-shrink: 0; }
+  .rv-val { font-weight: 600; text-align: right; word-break: break-word; }
+  .rv-div { font-size: 11px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--hint); padding: 20px 0 8px; }
+
+  .send-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-top: 24px; }
+  .send-panel p { font-size: 14px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+
+  .info-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 14px; font-size: 14px; color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  .toast { position: fixed; bottom: 36px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; padding: 12px 24px; border-radius: 24px; font-size: 15px; font-weight: 500; opacity: 0; transition: opacity 0.2s; pointer-events: none; white-space: nowrap; z-index: 99; }
+  .toast.show { opacity: 1; }
+
+  .num-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .num-tile {
+    min-width: 58px; padding: 14px 8px; font-size: 17px; font-weight: 600;
+    text-align: center; background: var(--surface); border: 2px solid var(--border);
+    border-radius: var(--radius-sm); cursor: pointer; color: var(--muted);
+    transition: all 0.1s; user-select: none; flex: 1; max-width: 72px;
+  }
+  .num-tile.on { background: var(--text); color: var(--surface); border-color: var(--text); }
+  .num-tile:active { opacity: 0.75; transform: scale(0.95); }
+
+  input[type=number] { -moz-appearance: textfield; }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="topbar-row">
+      <h1>Tarm QC</h1>
+      <span class="stepind" id="stepind">Steg 1 av 3</span>
+    </div>
+    <div class="prog">
+      <div class="prog-seg active" id="ps1"></div>
+      <div class="prog-seg" id="ps2"></div>
+      <div class="prog-seg" id="ps3"></div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ======== STEP 1 ======== -->
+    <div class="step on" id="step1">
+
+      <p class="sec">Generell info</p>
+      <div class="info-chip">QC Representant: Saed Jalal</div>
+
+      <div class="grid2">
+        <div class="field">
+          <label>Leverandør</label>
+          <select id="supplier">
+            <option value="">Velg...</option>
+            <option>P040</option><option>P050</option><option>P070</option>
+            <option>P073</option><option>P075</option><option>P080</option>
+            <option>P088</option><option>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Produkt</label>
+          <select id="product">
+            <option value="">Velg...</option>
+            <option>Sheep Casing</option><option>Hog Casing</option>
+            <option>Beef Casing</option><option>Goat Casing</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label>Kaliber</label>
+          <select id="caliber">
+            <option value="">Velg...</option>
+            <option>16-18</option><option>17-19</option><option>18-20</option>
+            <option>19-21</option><option>20-22</option><option>21-23</option>
+            <option>22-24</option><option>22-25</option><option>23-25</option>
+            <option>24-26</option><option>25-27</option><option>26-28</option>
+            <option>27-29</option><option>28-30</option><option>29-31</option>
+            <option>30-32</option><option>31-33</option><option>32-34</option>
+            <option>33-35</option><option>34-36</option><option>35-37</option>
+            <option>36-38</option><option>37-39</option><option>38-40</option>
+            <option>39-41</option><option>40-42</option><option>41-43</option>
+            <option>42-44</option><option>43-45</option><option>44-46</option>
+            <option>45-47</option><option>46-48</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Kvalitet</label>
+          <select id="quality">
+            <option value="">Velg...</option>
+            <option>AA</option><option>A</option><option>AAB</option>
+            <option>AB</option><option>ABC</option><option>B</option>
+            <option>BC</option><option>C</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label>Opprinnelse</label>
+          <select id="origin">
+            <option value="">Velg...</option>
+            <option>Australia</option><option>New Zealand</option>
+            <option>China</option><option>Turkey</option>
+            <option>Middle East</option><option>Europe</option>
+            <option>Brazil</option><option>Uruguay</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Spesifikasjon</label>
+          <select id="spec">
+            <option value="">Velg...</option>
+            <option>2-16</option><option>2-18</option><option>2-20</option>
+            <option>3-14</option><option>4-12</option><option>5-10</option>
+            <option>7-10</option><option>7-8</option><option>5m+</option>
+            <option>6m+</option><option>7m+</option><option>8m+</option>
+            <option>10m+</option><option>12m+</option><option>14m+</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label>Cask nr.</label>
+          <input type="text" id="caskno" placeholder="C-1234" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Batch nr.</label>
+          <input type="text" id="batchno" placeholder="B-5678" autocomplete="off">
+        </div>
+      </div>
+
+      <p class="sec">Make up</p>
+      <div class="toggle-group" id="makeup-tog">
+        <div class="tog" data-val="Salted" onclick="pickToggle('makeup-tog',this)">Salted</div>
+        <div class="tog" data-val="SoftTube" onclick="pickToggle('makeup-tog',this)">Soft Tube</div>
+      </div>
+
+      <p class="sec">Antall bunter</p>
+      <div class="toggle-group" id="hanks-tog">
+        <div class="tog" data-val="1" onclick="pickToggle('hanks-tog',this)">1 bunt</div>
+        <div class="tog" data-val="2" onclick="pickToggle('hanks-tog',this)">2 bunter</div>
+      </div>
+
+      <p class="sec">Ring farger</p>
+      <div class="grid2">
+        <div class="field">
+          <label>Farge 1</label>
+          <input type="text" id="ring1" placeholder="F.eks. Rød" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Farge 2</label>
+          <input type="text" id="ring2" placeholder="F.eks. Blå" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Andre notater</label>
+        <textarea id="notes" rows="2" placeholder="Valgfritt..."></textarea>
+      </div>
+
+      <button class="btn btn-primary" onclick="goStep(2)">Neste: Mål tarmer →</button>
+    </div>
+
+    <!-- ======== STEP 2 ======== -->
+    <div class="step" id="step2">
+
+      <div class="piece-nav">
+        <button class="nav-btn" id="prevBtn" onclick="navPiece(-1)" disabled>‹</button>
+        <div class="piece-center">
+          <div class="piece-title" id="pieceTitle">Tarm 1</div>
+          <div class="piece-sub" id="pieceSub">Fyll inn mål</div>
+        </div>
+        <button class="nav-btn" onclick="navPiece(1)">›</button>
+      </div>
+
+      <div class="grid2">
+        <div class="field bignum">
+          <label>Beg +1m (mm)</label>
+          <input type="number" id="p-beg" step="0.5" min="0" placeholder="—" inputmode="decimal" oninput="savePiece()">
+        </div>
+        <div class="field bignum">
+          <label>End -1m (mm)</label>
+          <input type="number" id="p-end" step="0.5" min="0" placeholder="—" inputmode="decimal" oninput="savePiece()">
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="field bignum">
+          <label>Meter</label>
+          <input type="number" id="p-m" step="0.5" min="0" placeholder="—" inputmode="decimal" oninput="savePiece()">
+        </div>
+        <div class="field">
+          <label>Kvalitet</label>
+          <select id="p-q" onchange="savePiece()" style="padding-top:19px;padding-bottom:19px;font-size:18px;font-weight:600">
+            <option value="">-</option>
+            <option>AA</option><option>A</option><option>AAB</option>
+            <option>AB</option><option>ABC</option><option>B</option>
+            <option>BC</option><option>C</option>
+          </select>
+        </div>
+      </div>
+
+      <p class="sec" style="margin-top:24px">Teksturfeil</p>
+      <div class="pill-grid" id="t-pills">
+        <label class="pill"><input type="checkbox" value="Sprits" onchange="savePiece()"> Sprits</label>
+        <label class="pill"><input type="checkbox" value="Pinholes" onchange="savePiece()"> Pinholes</label>
+        <label class="pill"><input type="checkbox" value="Holes" onchange="savePiece()"> Holes</label>
+        <label class="pill"><input type="checkbox" value="Weak" onchange="savePiece()"> Weak</label>
+        <label class="pill"><input type="checkbox" value="Veins" onchange="savePiece()"> Veins</label>
+        <label class="pill"><input type="checkbox" value="Marmorated" onchange="savePiece()"> Marmorated</label>
+        <label class="pill"><input type="checkbox" value="Wavy" onchange="savePiece()"> Wavy</label>
+      </div>
+
+      <p class="sec" style="margin-top:26px">Avvik</p>
+      <div class="toggle-group">
+        <div class="tog" id="tog-under" onclick="toggleUO('under')">Undergrade</div>
+        <div class="tog" id="tog-over" onclick="toggleUO('over')">Overgrade</div>
+      </div>
+      <div class="uo-input" id="under-input">
+        <div style="margin-top:10px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:var(--hint);margin-bottom:8px">Undergrade — velg meter</div>
+          <div class="num-row" id="under-tiles"></div>
+        </div>
+      </div>
+      <div class="uo-input" id="over-input">
+        <div style="margin-top:10px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:var(--hint);margin-bottom:8px">Overgrade — velg meter</div>
+          <div class="num-row" id="over-tiles"></div>
+        </div>
+      </div>
+
+      <div class="stat-bar">
+        <div class="stat-item"><div class="stat-val" id="cnt-val">0</div><div class="stat-lbl">Tarmer</div></div>
+        <div class="stat-item"><div class="stat-val" id="tot-val">0.0</div><div class="stat-lbl">Meter</div></div>
+        <div class="stat-item"><div class="stat-val" id="avg-val">—</div><div class="stat-lbl">Gj.sn. mm</div></div>
+      </div>
+      <div class="dot-strip" id="dotstrip"></div>
+
+      <button class="btn btn-primary" style="margin-top:22px" onclick="goStep(3)">Neste: Send rapport →</button>
+      <button class="btn btn-ghost" onclick="goStep(1)">← Tilbake</button>
+    </div>
+
+    <!-- ======== STEP 3 ======== -->
+    <div class="step" id="step3">
+      <p class="sec">Oppsummering</p>
+      <div id="rv-content"></div>
+
+      <div class="send-panel">
+        <p>Rapporten sendes som e-post til Claude-agenten som fyller inn systemet automatisk.</p>
+        <button class="btn btn-primary" onclick="doSend()">Send rapport ↗</button>
+      </div>
+
+      <button class="btn btn-ghost" onclick="goStep(2)">← Tilbake</button>
+      <button class="btn btn-ghost" onclick="resetAll()" style="margin-top:4px">+ Start ny rapport</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const AGENT_EMAIL = 'stian@notim.no';
+
+  let curStep = 1, curPiece = 1, pieces = {};
+  let makeupVal = '', hanksVal = '';
+  let uoState = { under: false, over: false };
+  let uoVals  = { under: '', over: '' };
+
+  function pickToggle(groupId, el) {
+    document.querySelectorAll('#' + groupId + ' .tog').forEach(t => t.classList.remove('on'));
+    el.classList.add('on');
+    if (groupId === 'makeup-tog') makeupVal = el.dataset.val;
+    if (groupId === 'hanks-tog') hanksVal = el.dataset.val;
+  }
+
+  function toggleUO(which) {
+    uoState[which] = !uoState[which];
+    document.getElementById('tog-' + which).classList.toggle('on', uoState[which]);
+    document.getElementById(which + '-input').classList.toggle('show', uoState[which]);
+    if (!uoState[which]) { uoVals[which] = ''; renderTiles(which); }
+    savePiece();
+  }
+
+  const UO_STEPS = ['0.5','1.0','1.5','2.0','2.5','3.0','3.5','4.0','4.5','5.0','5.5','6.0','6.5','7.0','7.5','8.0','8.5','9.0','9.5','10.0'];
+
+  function renderTiles(which) {
+    const cont = document.getElementById(which + '-tiles');
+    if (!cont) return;
+    cont.innerHTML = UO_STEPS.map(v =>
+      `<div class="num-tile${uoVals[which]===v?' on':''}" onclick="pickTile('${which}','${v}')">${v}</div>`
+    ).join('');
+  }
+
+  function pickTile(which, val) {
+    uoVals[which] = uoVals[which] === val ? '' : val;
+    renderTiles(which);
+    savePiece();
+  }
+
+  function goStep(n) {
+    document.getElementById('step' + curStep).classList.remove('on');
+    document.getElementById('ps' + curStep).classList.remove('active');
+    document.getElementById('ps' + curStep).classList.add('done');
+    curStep = n;
+    document.getElementById('step' + n).classList.add('on');
+    document.getElementById('ps' + n).classList.remove('done');
+    document.getElementById('ps' + n).classList.add('active');
+    document.getElementById('stepind').textContent = 'Steg ' + n + ' av 3';
+    if (n === 3) buildReview();
+    window.scrollTo(0, 0);
+  }
+
+  function savePiece() {
+    pieces[curPiece] = {
+      beg: gv('p-beg'), end: gv('p-end'), m: gv('p-m'), q: gv('p-q'),
+      u: uoState.under ? (uoVals.under || '') : '',
+      o: uoState.over  ? (uoVals.over  || '') : '',
+      t: [...document.querySelectorAll('#t-pills input:checked')].map(i => i.value),
+      uoState: { under: uoState.under, over: uoState.over },
+      uoVals: { under: uoVals.under, over: uoVals.over }
+    };
+    document.querySelectorAll('.pill').forEach(el =>
+      el.classList.toggle('on', el.querySelector('input').checked));
+    updateStats();
+  }
+
+  function loadPiece(n) {
+    const p = pieces[n] || {};
+    ['p-beg','p-end','p-m','p-q'].forEach((id, i) => {
+      const el = document.getElementById(id);
+      if (el) el.value = [p.beg,p.end,p.m,p.q][i] || '';
+    });
+    document.querySelectorAll('#t-pills input').forEach(cb => {
+      cb.checked = ((p.t||[]).includes(cb.value));
+      cb.closest('.pill').classList.toggle('on', cb.checked);
+    });
+    uoState = p.uoState ? { ...p.uoState } : { under: false, over: false };
+    uoVals  = p.uoVals  ? { ...p.uoVals  } : { under: '', over: '' };
+    ['under','over'].forEach(w => {
+      document.getElementById('tog-' + w).classList.toggle('on', uoState[w]);
+      document.getElementById(w + '-input').classList.toggle('show', uoState[w]);
+    });
+    renderTiles('under'); renderTiles('over');
+  }
+
+  function navPiece(d) {
+    savePiece();
+    if (d < 0 && curPiece <= 1) return;
+    curPiece += d;
+    document.getElementById('prevBtn').disabled = curPiece <= 1;
+    document.getElementById('pieceTitle').textContent = 'Tarm ' + curPiece;
+    const p = pieces[curPiece];
+    document.getElementById('pieceSub').textContent = p && p.m ? p.m + 'm · ' + (p.q || '?') : 'Fyll inn mål';
+    loadPiece(curPiece);
+  }
+
+  function updateStats() {
+    const ps = Object.values(pieces).filter(p => p.m);
+    const tot = ps.reduce((s,p) => s + (parseFloat(p.m)||0), 0);
+    const cals = ps.flatMap(p => [parseFloat(p.beg)||0, parseFloat(p.end)||0]).filter(v => v > 0);
+    const avg = cals.length ? (cals.reduce((s,v)=>s+v,0)/cals.length).toFixed(1) : '—';
+    document.getElementById('cnt-val').textContent = ps.length;
+    document.getElementById('tot-val').textContent = tot.toFixed(1);
+    document.getElementById('avg-val').textContent = avg;
+    const n = Math.max(curPiece, Object.keys(pieces).length, 1);
+    document.getElementById('dotstrip').innerHTML = Array.from({length:n},(_,i)=>
+      `<div class="dot${pieces[i+1]&&pieces[i+1].m?' filled':''}"></div>`).join('');
+    const p = pieces[curPiece];
+    document.getElementById('pieceSub').textContent = p && p.m ? p.m+'m · '+(p.q||'?') : 'Fyll inn mål';
+  }
+
+  function gv(id) { return (document.getElementById(id)||{}).value || ''; }
+
+  function calcStats() {
+    const ps = Object.values(pieces).filter(p => p.m);
+    const tot = ps.reduce((s,p)=>s+(parseFloat(p.m)||0),0);
+    const tu  = ps.reduce((s,p)=>s+(parseFloat(p.u)||0),0);
+    const to  = ps.reduce((s,p)=>s+(parseFloat(p.o)||0),0);
+    const cals = ps.flatMap(p=>[parseFloat(p.beg)||0,parseFloat(p.end)||0]).filter(x=>x>0);
+    const avg = cals.length?(cals.reduce((s,x)=>s+x,0)/cals.length).toFixed(1):'—';
+    return { cnt:ps.length, tot:tot.toFixed(1), tu:tu.toFixed(1), to:to.toFixed(1), avg };
+  }
+
+  function buildReview() {
+    const s = calcStats();
+    const today = new Date().toLocaleDateString('no-NO');
+    const ringColors = [gv('ring1'),gv('ring2')].filter(Boolean).join(' / ') || '—';
+    const rows = [
+      ['Dato',today], ['Leverandør',gv('supplier')], ['QC Repr.','Saed Jalal'],
+      ['Produkt',gv('product')], ['Kaliber',gv('caliber')], ['Kvalitet',gv('quality')],
+      ['Opprinnelse',gv('origin')], ['Spesifikasjon',gv('spec')], ['Make up',makeupVal],
+      ['Cask nr.',gv('caskno')], ['Batch nr.',gv('batchno')],
+      ['Ant. bunter',hanksVal], ['Ring farger',ringColors],
+      ['DIVIDER'],
+      ['Ant. tarmer',s.cnt], ['Total meter',s.tot+'m'],
+      ['Gj.sn. kaliber',s.avg+'mm'], ['Undergrade',s.tu+'m'], ['Overgrade',s.to+'m'],
+    ];
+    document.getElementById('rv-content').innerHTML = rows.map(([k,val])=>
+      k==='DIVIDER'
+        ? `<div class="rv-div">Måleresultater</div>`
+        : `<div class="rv-row"><span class="rv-key">${k}</span><span class="rv-val">${val||'—'}</span></div>`
+    ).join('');
+  }
+
+  function genReport() {
+    const s = calcStats();
+    const today = new Date().toLocaleDateString('no-NO');
+    const ringColors = [gv('ring1'),gv('ring2')].filter(Boolean).join(' / ') || '—';
+    const piecelines = Object.entries(pieces)
+      .filter(([,p])=>p.m)
+      .map(([n,p])=>{
+        let l = `Tarm ${n}: beg=${p.beg||'-'}mm  end=${p.end||'-'}mm  ${p.m}m  kvalitet=${p.q||'-'}`;
+        if (parseFloat(p.u)>0) l += `  undergrade=${p.u}m`;
+        if (parseFloat(p.o)>0) l += `  overgrade=${p.o}m`;
+        if (p.t&&p.t.length) l += `  tekstur: ${p.t.join(', ')}`;
+        return l;
+      }).join('\n');
+
+    return `QC RAPPORT — NATURTARM
+==================================================
+Dato:              ${today}
+Leverandør:        ${gv('supplier')}
+QC Representant:   Saed Jalal
+Produkt:           ${gv('product')}
+Kaliber:           ${gv('caliber')}
+Kvalitet:          ${gv('quality')}
+Opprinnelse:       ${gv('origin')}
+Spesifikasjon:     ${gv('spec')}
+Make up:           ${makeupVal||'—'}
+Cask nr.:          ${gv('caskno')}
+Batch nr.:         ${gv('batchno')}
+Ant. bunter:       ${hanksVal||'—'}
+Ring farger:       ${ringColors}
+Andre notater:     ${gv('notes')||'—'}
+
+MÅLERESULTATER
+--------------------------------------------------
+Ant. tarmer:       ${s.cnt}
+Total meter:       ${s.tot}m
+Gj.sn. kaliber:   ${s.avg}mm
+Undergrade:        ${s.tu}m
+Overgrade:         ${s.to}m
+
+TARM-FOR-TARM
+--------------------------------------------------
+${piecelines||'(ingen tarmer registrert)'}
+
+==================================================
+Generert av Tarm QC-app · ${today}`;
+  }
+
+  function doSend() {
+    if (!AGENT_EMAIL) { showToast('Agent e-post er ikke konfigurert ennå'); return; }
+    const sub = `QC Rapport – ${gv('product')||'Tarm'} – ${gv('supplier')||''} – ${new Date().toLocaleDateString('no-NO')}`;
+    window.location.href = 'mailto:'+AGENT_EMAIL+'?subject='+encodeURIComponent(sub)+'&body='+encodeURIComponent(genReport());
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'), 2500);
+  }
+
+  function resetAll() {
+    if (!confirm('Start ny rapport? Alt vil gå tapt.')) return;
+    pieces={}; curPiece=1; makeupVal=''; hanksVal='';
+    uoState={under:false,over:false};
+    uoVals={under:'',over:''};
+    renderTiles('under'); renderTiles('over');
+    ['supplier','product','caliber','quality','origin','spec','caskno','batchno','ring1','ring2','notes'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.value='';
+    });
+    document.querySelectorAll('.tog').forEach(t=>t.classList.remove('on'));
+    goStep(1);
+  }
+</script>
+</body>
+</html>
